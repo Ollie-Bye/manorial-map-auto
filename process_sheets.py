@@ -3,13 +3,14 @@ import json
 import re
 import urllib.request
 
-# Ensure this matches your "Publish to Web" CSV URL for the "Units" tab
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-EZVrt4IOI6M5d3DQVPSCcQMHQSmZPot7DYWZLDzKRoIhCF0Z55nG2zJJ5C_2l4RKYESXWDhtmU8G/pub?gid=664764410&single=true&output=csv"
+# Ensure this matches your published "Units" tab CSV URL
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1v.../pub?gid=664764410&single=true&output=csv"
 
 def parse_units_sheet(csv_url):
     spatial_units = []
     temporal_records = {}
     county_records = []
+    unit_county_lookup = {}  # Tracks unit_id -> historic county
 
     # 1. Fetch CSV content directly from Google Sheets
     req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -19,7 +20,7 @@ def parse_units_sheet(csv_url):
     reader = csv.reader(lines)
     rows = list(reader)
 
-    # 2. Find header row containing "ID" or "Name"
+    # 2. Find header row
     header_idx = -1
     for idx, row in enumerate(rows[:15]):
         cleaned_row = [c.strip().lower() for c in row if c]
@@ -28,13 +29,11 @@ def parse_units_sheet(csv_url):
             break
 
     if header_idx == -1:
-        # Fallback to row 2 if header detection fails
         header_idx = 2
 
     headers = [c.strip().lower() for c in rows[header_idx]]
     data_rows = rows[header_idx + 1:]
 
-    # Helper function to get value by absolute column index (0-based: A=0, B=1, C=2, D=3, etc.)
     def get_col(row, idx):
         if idx < len(row):
             return row[idx].strip()
@@ -42,19 +41,25 @@ def parse_units_sheet(csv_url):
 
     unit_tenure_lookup = {}
 
+    # Pass 1: Parse all units and collect county metadata
     for row in data_rows:
         if not row or not any(row):
             continue
 
-        unit_name = get_col(row, 0) # Col A: Unit Name (e.g. Bere Regis)
+        unit_name = get_col(row, 0)      # Col A: Unit Name
+        historic_county = get_col(row, 2) # Col C: Historic County (e.g. Dorset, Lancashire)
+        if not historic_county:
+            historic_county = "dorset"
 
         # --- SEIGNEURIAL / MANOR PORTION (Col D: Manor ID) ---
-        manor_id = get_col(row, 3) # Col D is index 3
+        manor_id = get_col(row, 3) # Col D
         if manor_id:
             display_name = unit_name
             prefix = "Manor of"
             unit_type = "seigneurial"
             default_geom = f"{manor_id}_01"
+
+            unit_county_lookup[manor_id] = historic_county.lower().strip()
 
             spatial_units.append({
                 "unit_id": manor_id,
@@ -64,14 +69,13 @@ def parse_units_sheet(csv_url):
                 "default_geometry": default_geom
             })
 
-            # Multi-line cells for Manor attributes (adjust column indices if needed)
-            dates_lines = [l.strip() for l in get_col(row, 4).split("\n") if l.strip()]   # Col E: Dates
-            lord_lines = [l.strip() for l in get_col(row, 5).split("\n")]                # Col F: Lord
-            title_lines = [l.strip() for l in get_col(row, 6).split("\n")]               # Col G: Title
-            family_lines = [l.strip() for l in get_col(row, 7).split("\n")]              # Col H: Family
-            overlord_lines = [l.strip() for l in get_col(row, 8).split("\n")]            # Col I: Overlord
-            moiety_lines = [l.strip() for l in get_col(row, 9).split("\n")]              # Col J: Moiety
-            geom_lines = [l.strip() for l in get_col(row, 10).split("\n")]               # Col K: Geom Override
+            dates_lines = [l.strip() for l in get_col(row, 4).split("\n") if l.strip()]
+            lord_lines = [l.strip() for l in get_col(row, 5).split("\n")]
+            title_lines = [l.strip() for l in get_col(row, 6).split("\n")]
+            family_lines = [l.strip() for l in get_col(row, 7).split("\n")]
+            overlord_lines = [l.strip() for l in get_col(row, 8).split("\n")]
+            moiety_lines = [l.strip() for l in get_col(row, 9).split("\n")]
+            geom_lines = [l.strip() for l in get_col(row, 10).split("\n")]
 
             manor_records = []
             tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", get_col(row, 5), re.IGNORECASE)
@@ -115,12 +119,14 @@ def parse_units_sheet(csv_url):
             unit_tenure_lookup[manor_id] = manor_records
 
         # --- ADMINISTRATIVE / PARISH PORTION (Col M: Parish ID) ---
-        parish_id = get_col(row, 12) # Col M is index 12
+        parish_id = get_col(row, 12) # Col M
         if parish_id:
             display_name = unit_name
             prefix = "Parish of"
             unit_type = "administrative"
             default_geom = f"{parish_id}_01"
+
+            unit_county_lookup[parish_id] = historic_county.lower().strip()
 
             spatial_units.append({
                 "unit_id": parish_id,
@@ -130,7 +136,6 @@ def parse_units_sheet(csv_url):
                 "default_geometry": default_geom
             })
 
-            # Basic administrative temporal record
             temporal_records[parish_id] = [{
                 "start": 1066,
                 "end": 1922,
@@ -144,7 +149,7 @@ def parse_units_sheet(csv_url):
                 "name": display_name
             }]
 
-    # Pass 2: Resolve "Tied to" inherited links
+    # Pass 2: Resolve "Tied to" inherited links globally across all counties
     for uid, records in temporal_records.items():
         if records and records[0].get("type") == "link":
             target_id = records[0]["tied_to"]
@@ -162,16 +167,34 @@ def parse_units_sheet(csv_url):
     return {
         "spatial": spatial_units,
         "temporal": temporal_records,
+        "county_lookup": unit_county_lookup,
         "counties": county_records
     }
 
 if __name__ == "__main__":
     dataset = parse_units_sheet(GOOGLE_SHEET_CSV_URL)
     
-    with open("dorset_history.json", "w", encoding="utf-8") as f:
-        json.dump(dataset["temporal"], f, indent=2)
-        
+    temporal_records = dataset["temporal"]
+    unit_county_lookup = dataset["county_lookup"]
+
+    # Pass 3: Group temporal records by county and write county JSON files
+    county_grouped_history = {}
+
+    for uid, records in temporal_records.items():
+        county_name = unit_county_lookup.get(uid, "dorset")
+        if county_name not in county_grouped_history:
+            county_grouped_history[county_name] = {}
+        county_grouped_history[county_name][uid] = records
+
+    generated_files = []
+    for county_name, history_data in county_grouped_history.items():
+        filename = f"{county_name}_history.json"
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(history_data, f, indent=2)
+        generated_files.append(filename)
+        print(f"Generated {filename} containing {len(history_data)} unit records.")
+
     with open("counties.json", "w", encoding="utf-8") as f:
         json.dump(dataset["counties"], f, indent=2)
 
-    print("Data successfully fetched from Google Sheets and generated JSON files!")
+    print("Pipeline complete! Generated datasets:", ", ".join(generated_files))
