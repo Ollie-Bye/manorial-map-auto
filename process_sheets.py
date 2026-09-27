@@ -3,16 +3,59 @@ import json
 import re
 import urllib.request
 
-# Ensure this matches your published "Units" tab CSV URL
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-EZVrt4IOI6M5d3DQVPSCcQMHQSmZPot7DYWZLDzKRoIhCF0Z55nG2zJJ5C_2l4RKYESXWDhtmU8G/pub?gid=664764410&single=true&output=csv"
+# Published Google Sheets CSV URL for "Units" tab
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/109Dg1l11_7gnsE84UVXAFvfl8qdDievI_FiR2P-Xcx8/gviz/tq?tqx=out:csv&gid=664764410"
+
+def parse_dated_cell(cell_value, default_end=1922):
+    """
+    Parses multi-line cells formatted as:
+    '1066 bere_01\n1380 [None]'
+    Returns a list of dicts with start, end, and value.
+    """
+    lines = [l.strip() for l in cell_value.split("\n") if l.strip()]
+    parsed = []
+    
+    for line in lines:
+        match = re.match(r'^(\d{4})\s+(.*)$', line)
+        if match:
+            year = int(match.group(1))
+            val = match.group(2).strip()
+            parsed.append({"year": year, "value": val})
+        else:
+            parsed.append({"year": None, "value": line})
+
+    records = []
+    for i, entry in enumerate(parsed):
+        start_yr = entry["year"]
+        val = entry["value"]
+        
+        # If explicitly marked as [None] or None, the unit/geometry ceases to exist from this date
+        if val.lower() in ["[none]", "none", "-"]:
+            continue
+
+        if start_yr is None:
+            continue
+            
+        # Determine end year: one year prior to next entry's start year, or default_end
+        if i + 1 < len(parsed) and parsed[i + 1]["year"] is not None:
+            end_yr = parsed[i + 1]["year"] - 1
+        else:
+            end_yr = default_end
+            
+        records.append({
+            "start": start_yr,
+            "end": end_yr,
+            "value": val
+        })
+        
+    return records
 
 def parse_units_sheet(csv_url):
     spatial_units = []
     temporal_records = {}
     county_records = []
-    unit_county_lookup = {}  # Tracks unit_id -> historic county
+    unit_county_lookup = {}
 
-    # 1. Fetch CSV content directly from Google Sheets
     req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req) as response:
         lines = [line.decode('utf-8-sig') for line in response.readlines()]
@@ -20,117 +63,124 @@ def parse_units_sheet(csv_url):
     reader = csv.reader(lines)
     rows = list(reader)
 
-    # 2. Find header row
+    # 1. Locate primary header row dynamically
     header_idx = -1
     for idx, row in enumerate(rows[:15]):
-        cleaned_row = [c.strip().lower() for c in row if c]
-        if "id" in cleaned_row or "name" in cleaned_row:
+        cleaned_row = [re.sub(r'[\s_\-]', '', c.lower().strip()) for c in row if c]
+        if "manorid" in cleaned_row or "id" in cleaned_row or "unitname" in cleaned_row:
             header_idx = idx
             break
 
     if header_idx == -1:
         header_idx = 2
 
-    headers = [c.strip().lower() for c in rows[header_idx]]
+    raw_headers = [c.strip() for c in rows[header_idx]]
+    norm_headers = [re.sub(r'[\s_\-]', '', h.lower()) for h in raw_headers]
+    col_map = {name: idx for idx, name in enumerate(norm_headers) if name}
     data_rows = rows[header_idx + 1:]
 
-    def get_col(row, idx):
-        if idx < len(row):
-            return row[idx].strip()
+    def get_val(row, *keys):
+        for key in keys:
+            norm_key = re.sub(r'[\s_\-]', '', key.lower())
+            idx = col_map.get(norm_key)
+            if idx is not None and idx < len(row):
+                val = row[idx].strip()
+                if val:
+                    return val
         return ""
 
     unit_tenure_lookup = {}
 
-    # Pass 1: Parse all units and collect county metadata
     for row in data_rows:
         if not row or not any(row):
             continue
 
-        unit_name = get_col(row, 0)        # Col A: Unit Name
-        historic_county = get_col(row, 2)  # Col C: Historic County (e.g. Dorset, Lancashire)
-        if not historic_county:
-            historic_county = "dorset"
+        unit_name = get_val(row, "unitname", "name")
+        historic_county = get_val(row, "historiccounty", "county") or "dorset"
 
-        manor_id = get_col(row, 3)   # Col D (index 3)
-        parish_id = get_col(row, 12) # Col M (index 12)
+        manor_id = get_val(row, "manorid")
+        parish_id = get_val(row, "parishid")
 
         primary_id = manor_id or parish_id
         if not primary_id:
-            continue  # Skip row only if there is truly no ID anywhere
+            continue
 
-        # --- SEIGNEURIAL / MANOR / HONOUR PORTION ---
-        if manor_id or (primary_id and not parish_id):
-            unit_id = manor_id or primary_id
+        # --- SEIGNEURIAL / MANOR PORTION ---
+        if manor_id:
             display_name = unit_name
-            prefix = "Honour of" if "hon_" in unit_id else ("Duchy of" if "duc_" in unit_id else "Manor of")
+            prefix = "Honour of" if "hon_" in manor_id else ("Duchy of" if "duc_" in manor_id else "Manor of")
             unit_type = "seigneurial"
-            default_geom = f"{unit_id}_01"
 
-            unit_county_lookup[unit_id] = historic_county.lower().strip()
+            unit_county_lookup[manor_id] = historic_county.lower().strip()
+
+            # Parse dated attributes targeting "S-Geometry"
+            s_geom_raw = get_val(row, "sgeometry", "sgeom", "manorgeometry")
+            geom_entries = parse_dated_cell(s_geom_raw)
+            lord_entries = parse_dated_cell(get_val(row, "lord"))
+            overlord_entries = parse_dated_cell(get_val(row, "overlord"))
+            lord_2nd_entries = parse_dated_cell(get_val(row, "lord2ndmoiety", "lord2nd"))
+            overlord_2nd_entries = parse_dated_cell(get_val(row, "overlord2ndmoiety", "overlord2nd"))
+
+            default_geom = geom_entries[0]["value"] if geom_entries else f"{manor_id}_01"
 
             spatial_units.append({
-                "unit_id": unit_id,
+                "unit_id": manor_id,
                 "display_name": display_name,
                 "display_prefix": prefix,
                 "type": unit_type,
                 "default_geometry": default_geom
             })
 
-            dates_lines = [l.strip() for l in get_col(row, 4).split("\n") if l.strip()]
-            lord_lines = [l.strip() for l in get_col(row, 5).split("\n")]
-            title_lines = [l.strip() for l in get_col(row, 6).split("\n")]
-            family_lines = [l.strip() for l in get_col(row, 7).split("\n")]
-            overlord_lines = [l.strip() for l in get_col(row, 8).split("\n")]
-            moiety_lines = [l.strip() for l in get_col(row, 9).split("\n")]
-            geom_lines = [l.strip() for l in get_col(row, 10).split("\n")]
-
             manor_records = []
-            tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", get_col(row, 5), re.IGNORECASE)
+            lord_raw = get_val(row, "lord")
+            tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", lord_raw, re.IGNORECASE)
 
             if tied_match:
                 target_id = tied_match.group(1)
                 manor_records.append({"tied_to": target_id, "type": "link"})
             else:
-                for i, date_str in enumerate(dates_lines):
-                    years = re.findall(r'\d{4}', date_str)
-                    if not years:
-                        continue
-                    start_yr = int(years[0])
-                    end_yr = int(years[1]) if len(years) > 1 else start_yr
+                # Build time segments based on S-Geometry date ranges
+                for g_item in (geom_entries or [{"start": 1066, "end": 1922, "value": default_geom}]):
+                    start_yr = g_item["start"]
+                    end_yr = g_item["end"]
+                    geom_file = g_item["value"]
 
-                    lord = lord_lines[i] if i < len(lord_lines) else ""
-                    title = title_lines[i] if i < len(title_lines) else ""
-                    family = family_lines[i] if i < len(family_lines) else ""
-                    overlord = overlord_lines[i] if i < len(overlord_lines) else ""
-                    moiety = moiety_lines[i] if i < len(moiety_lines) else ""
-                    geom_override = geom_lines[i] if i < len(geom_lines) else ""
+                    lord_val = next((l["value"] for l in lord_entries if l["start"] <= start_yr <= l["end"]), "")
+                    overlord_val = next((o["value"] for o in overlord_entries if o["start"] <= start_yr <= o["end"]), "")
+                    lord_2nd_val = next((l2["value"] for l2 in lord_2nd_entries if l2["start"] <= start_yr <= l2["end"]), "")
+                    overlord_2nd_val = next((o2["value"] for o2 in overlord_2nd_entries if o2["start"] <= start_yr <= o2["end"]), "")
 
-                    full_lord = lord
-                    if title:
-                        full_lord += f", {title}" if full_lord else title
-
-                    manor_records.append({
+                    record = {
                         "start": start_yr,
                         "end": end_yr,
-                        "lord": full_lord,
-                        "lord_family": family,
-                        "overlord": overlord,
-                        "moiety": moiety,
-                        "geometry_file": geom_override or default_geom,
+                        "lord": lord_val,
+                        "overlord": overlord_val,
+                        "geometry_file": geom_file,
                         "prefix": prefix,
                         "type": unit_type,
                         "name": display_name
-                    })
+                    }
 
-            temporal_records[unit_id] = manor_records
-            unit_tenure_lookup[unit_id] = manor_records
+                    if lord_2nd_val:
+                        record["lord_2nd_moiety"] = lord_2nd_val
+                    if overlord_2nd_val:
+                        record["overlord_2nd_moiety"] = overlord_2nd_val
+
+                    manor_records.append(record)
+
+            temporal_records[manor_id] = manor_records
+            unit_tenure_lookup[manor_id] = manor_records
 
         # --- ADMINISTRATIVE / PARISH PORTION ---
         if parish_id:
             display_name = unit_name
             prefix = "Parish of"
             unit_type = "administrative"
-            default_geom = f"{parish_id}_01"
+            
+            # Parse dated attributes targeting "A-Geometry"
+            a_geom_raw = get_val(row, "ageometry", "ageom", "parishgeometry") or f"{parish_id}_01"
+            parish_geom_entries = parse_dated_cell(a_geom_raw)
+            parish_geom = parish_geom_entries[0]["value"] if parish_geom_entries else a_geom_raw
 
             unit_county_lookup[parish_id] = historic_county.lower().strip()
 
@@ -139,23 +189,21 @@ def parse_units_sheet(csv_url):
                 "display_name": display_name,
                 "display_prefix": prefix,
                 "type": unit_type,
-                "default_geometry": default_geom
+                "default_geometry": parish_geom
             })
 
             temporal_records[parish_id] = [{
-                "start": 1066,
-                "end": 1922,
+                "start": parish_geom_entries[0]["start"] if parish_geom_entries else 1066,
+                "end": parish_geom_entries[-1]["end"] if parish_geom_entries else 1922,
                 "lord": "N/A",
-                "lord_family": "",
                 "overlord": "",
-                "moiety": "",
-                "geometry_file": default_geom,
+                "geometry_file": parish_geom,
                 "prefix": prefix,
                 "type": unit_type,
                 "name": display_name
             }]
 
-    # Pass 2: Resolve "Tied to" inherited links globally across all counties
+    # Pass 2: Resolve "Tied to" inherited links
     for uid, records in temporal_records.items():
         if records and records[0].get("type") == "link":
             target_id = records[0]["tied_to"]
@@ -183,7 +231,6 @@ if __name__ == "__main__":
     temporal_records = dataset["temporal"]
     unit_county_lookup = dataset["county_lookup"]
 
-    # Pass 3: Group temporal records by county and write county JSON files
     county_grouped_history = {}
 
     for uid, records in temporal_records.items():
@@ -199,8 +246,5 @@ if __name__ == "__main__":
             json.dump(history_data, f, indent=2)
         generated_files.append(filename)
         print(f"Generated {filename} containing {len(history_data)} unit records.")
-
-    with open("counties.json", "w", encoding="utf-8") as f:
-        json.dump(dataset["counties"], f, indent=2)
 
     print("Pipeline complete! Generated datasets:", ", ".join(generated_files))
