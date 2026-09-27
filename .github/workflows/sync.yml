@@ -1,9 +1,9 @@
 name: Sync Google Sheets Data
 
 on:
-  workflow_dispatch: # Allows you to trigger the sync manually with a button click
+  workflow_dispatch: # Allows manual trigger via "Run workflow" button
   schedule:
-    - cron: '0 0 * * *' # Automatically runs every night at midnight
+    - cron: '0 0 * * *' # Auto-runs every night at midnight
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/python-versions@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
