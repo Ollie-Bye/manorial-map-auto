@@ -4,7 +4,7 @@ import re
 import urllib.request
 
 # Published Google Sheets CSV URL for "Units" tab
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/109Dg1l11_7gnsE84UVXAFvfl8qdDievI_FiR2P-Xcx8/gviz/tq?tqx=out:csv&gid=664764410"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-EZVrt4IOI6M5d3DQVPSCcQMHQSmZPot7DYWZLDzKRoIhCF0Z55nG2zJJ5C_2l4RKYESXWDhtmU8G/pub?gid=664764410&single=true&output=csv"
 
 def parse_dated_cell(cell_value, default_end=1922):
     """
