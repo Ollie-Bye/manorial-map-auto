@@ -12,6 +12,9 @@ def parse_dated_cell(cell_value, default_end=1922):
     '1066 bere_01\n1380 [None]'
     Returns a list of dicts with start, end, and value.
     """
+    if not cell_value:
+        return []
+        
     lines = [l.strip() for l in cell_value.split("\n") if l.strip()]
     parsed = []
     
@@ -29,7 +32,7 @@ def parse_dated_cell(cell_value, default_end=1922):
         start_yr = entry["year"]
         val = entry["value"]
         
-        # If explicitly marked as [None] or None, the unit/geometry ceases to exist from this date
+        # If explicitly marked as [None] or None, the geometry/tenure ceases to exist from this date
         if val.lower() in ["[none]", "none", "-"]:
             continue
 
@@ -63,11 +66,11 @@ def parse_units_sheet(csv_url):
     reader = csv.reader(lines)
     rows = list(reader)
 
-    # 1. Locate primary header row dynamically
+    # 1. Locate primary header row dynamically by searching for exact/clean headers
     header_idx = -1
     for idx, row in enumerate(rows[:15]):
-        cleaned_row = [re.sub(r'[\s_\-]', '', c.lower().strip()) for c in row if c]
-        if "manorid" in cleaned_row or "id" in cleaned_row or "unitname" in cleaned_row:
+        cleaned_row = [re.sub(r'[\s_\-\(\)ⁿᵈ]', '', c.lower().strip()) for c in row if c]
+        if "sid" in cleaned_row or "unit" in cleaned_row or "sgeometry" in cleaned_row:
             header_idx = idx
             break
 
@@ -75,13 +78,13 @@ def parse_units_sheet(csv_url):
         header_idx = 2
 
     raw_headers = [c.strip() for c in rows[header_idx]]
-    norm_headers = [re.sub(r'[\s_\-]', '', h.lower()) for h in raw_headers]
+    norm_headers = [re.sub(r'[\s_\-\(\)ⁿᵈ]', '', h.lower()) for h in raw_headers]
     col_map = {name: idx for idx, name in enumerate(norm_headers) if name}
     data_rows = rows[header_idx + 1:]
 
     def get_val(row, *keys):
         for key in keys:
-            norm_key = re.sub(r'[\s_\-]', '', key.lower())
+            norm_key = re.sub(r'[\s_\-\(\)ⁿᵈ]', '', key.lower())
             idx = col_map.get(norm_key)
             if idx is not None and idx < len(row):
                 val = row[idx].strip()
@@ -95,113 +98,77 @@ def parse_units_sheet(csv_url):
         if not row or not any(row):
             continue
 
-        unit_name = get_val(row, "unitname", "name")
-        historic_county = get_val(row, "historiccounty", "county") or "dorset"
+        unit_name = get_val(row, "Unit")
+        historic_county = get_val(row, "Historic County", "County") or "dorset"
+        s_id = get_val(row, "S-ID", "SID")
 
-        manor_id = get_val(row, "manorid")
-        parish_id = get_val(row, "parishid")
-
-        primary_id = manor_id or parish_id
-        if not primary_id:
+        if not s_id:
             continue
 
         # --- SEIGNEURIAL / MANOR PORTION ---
-        if manor_id:
-            display_name = unit_name
-            prefix = "Honour of" if "hon_" in manor_id else ("Duchy of" if "duc_" in manor_id else "Manor of")
-            unit_type = "seigneurial"
+        display_name = unit_name
+        prefix = "Honour of" if s_id.startswith("hon_") else ("Duchy of" if s_id.startswith("duc_") else "Manor of")
+        unit_type = "seigneurial"
 
-            unit_county_lookup[manor_id] = historic_county.lower().strip()
+        unit_county_lookup[s_id] = historic_county.lower().strip()
 
-            # Parse dated attributes targeting "S-Geometry"
-            s_geom_raw = get_val(row, "sgeometry", "sgeom", "manorgeometry")
-            geom_entries = parse_dated_cell(s_geom_raw)
-            lord_entries = parse_dated_cell(get_val(row, "lord"))
-            overlord_entries = parse_dated_cell(get_val(row, "overlord"))
-            lord_2nd_entries = parse_dated_cell(get_val(row, "lord2ndmoiety", "lord2nd"))
-            overlord_2nd_entries = parse_dated_cell(get_val(row, "overlord2ndmoiety", "overlord2nd"))
+        # Parse dated attributes
+        s_geom_raw = get_val(row, "S-Geometry", "SGeometry")
+        geom_entries = parse_dated_cell(s_geom_raw)
+        lord_entries = parse_dated_cell(get_val(row, "Lord"))
+        overlord_entries = parse_dated_cell(get_val(row, "Overlord"))
+        lord_2nd_entries = parse_dated_cell(get_val(row, "Lord (2ⁿᵈ Moiety)", "Lord (2nd Moiety)", "Lord 2nd Moiety"))
+        overlord_2nd_entries = parse_dated_cell(get_val(row, "Overlord (2ⁿᵈ Moiety)", "Overlord (2nd Moiety)", "Overlord 2nd Moiety"))
 
-            default_geom = geom_entries[0]["value"] if geom_entries else f"{manor_id}_01"
+        default_geom = geom_entries[0]["value"] if geom_entries else f"{s_id}_01"
 
-            spatial_units.append({
-                "unit_id": manor_id,
-                "display_name": display_name,
-                "display_prefix": prefix,
-                "type": unit_type,
-                "default_geometry": default_geom
-            })
+        spatial_units.append({
+            "unit_id": s_id,
+            "display_name": display_name,
+            "display_prefix": prefix,
+            "type": unit_type,
+            "default_geometry": default_geom
+        })
 
-            manor_records = []
-            lord_raw = get_val(row, "lord")
-            tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", lord_raw, re.IGNORECASE)
+        manor_records = []
+        lord_raw = get_val(row, "Lord")
+        tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", lord_raw, re.IGNORECASE)
 
-            if tied_match:
-                target_id = tied_match.group(1)
-                manor_records.append({"tied_to": target_id, "type": "link"})
-            else:
-                # Build time segments based on S-Geometry date ranges
-                for g_item in (geom_entries or [{"start": 1066, "end": 1922, "value": default_geom}]):
-                    start_yr = g_item["start"]
-                    end_yr = g_item["end"]
-                    geom_file = g_item["value"]
+        if tied_match:
+            target_id = tied_match.group(1)
+            manor_records.append({"tied_to": target_id, "type": "link"})
+        else:
+            # Build time segments based on S-Geometry date ranges
+            for g_item in (geom_entries or [{"start": 1066, "end": 1922, "value": default_geom}]):
+                start_yr = g_item["start"]
+                end_yr = g_item["end"]
+                geom_file = g_item["value"]
 
-                    lord_val = next((l["value"] for l in lord_entries if l["start"] <= start_yr <= l["end"]), "")
-                    overlord_val = next((o["value"] for o in overlord_entries if o["start"] <= start_yr <= o["end"]), "")
-                    lord_2nd_val = next((l2["value"] for l2 in lord_2nd_entries if l2["start"] <= start_yr <= l2["end"]), "")
-                    overlord_2nd_val = next((o2["value"] for o2 in overlord_2nd_entries if o2["start"] <= start_yr <= o2["end"]), "")
+                lord_val = next((l["value"] for l in lord_entries if l["start"] <= start_yr <= l["end"]), "")
+                overlord_val = next((o["value"] for o in overlord_entries if o["start"] <= start_yr <= o["end"]), "")
+                lord_2nd_val = next((l2["value"] for l2 in lord_2nd_entries if l2["start"] <= start_yr <= l2["end"]), "")
+                overlord_2nd_val = next((o2["value"] for o2 in overlord_2nd_entries if o2["start"] <= start_yr <= o2["end"]), "")
 
-                    record = {
-                        "start": start_yr,
-                        "end": end_yr,
-                        "lord": lord_val,
-                        "overlord": overlord_val,
-                        "geometry_file": geom_file,
-                        "prefix": prefix,
-                        "type": unit_type,
-                        "name": display_name
-                    }
+                record = {
+                    "start": start_yr,
+                    "end": end_yr,
+                    "lord": lord_val,
+                    "overlord": overlord_val,
+                    "geometry_file": geom_file,
+                    "prefix": prefix,
+                    "type": unit_type,
+                    "name": display_name
+                }
 
-                    if lord_2nd_val:
-                        record["lord_2nd_moiety"] = lord_2nd_val
-                    if overlord_2nd_val:
-                        record["overlord_2nd_moiety"] = overlord_2nd_val
+                if lord_2nd_val:
+                    record["lord_2nd_moiety"] = lord_2nd_val
+                if overlord_2nd_val:
+                    record["overlord_2nd_moiety"] = overlord_2nd_val
 
-                    manor_records.append(record)
+                manor_records.append(record)
 
-            temporal_records[manor_id] = manor_records
-            unit_tenure_lookup[manor_id] = manor_records
-
-        # --- ADMINISTRATIVE / PARISH PORTION ---
-        if parish_id:
-            display_name = unit_name
-            prefix = "Parish of"
-            unit_type = "administrative"
-            
-            # Parse dated attributes targeting "A-Geometry"
-            a_geom_raw = get_val(row, "ageometry", "ageom", "parishgeometry") or f"{parish_id}_01"
-            parish_geom_entries = parse_dated_cell(a_geom_raw)
-            parish_geom = parish_geom_entries[0]["value"] if parish_geom_entries else a_geom_raw
-
-            unit_county_lookup[parish_id] = historic_county.lower().strip()
-
-            spatial_units.append({
-                "unit_id": parish_id,
-                "display_name": display_name,
-                "display_prefix": prefix,
-                "type": unit_type,
-                "default_geometry": parish_geom
-            })
-
-            temporal_records[parish_id] = [{
-                "start": parish_geom_entries[0]["start"] if parish_geom_entries else 1066,
-                "end": parish_geom_entries[-1]["end"] if parish_geom_entries else 1922,
-                "lord": "N/A",
-                "overlord": "",
-                "geometry_file": parish_geom,
-                "prefix": prefix,
-                "type": unit_type,
-                "name": display_name
-            }]
+        temporal_records[s_id] = manor_records
+        unit_tenure_lookup[s_id] = manor_records
 
     # Pass 2: Resolve "Tied to" inherited links
     for uid, records in temporal_records.items():
