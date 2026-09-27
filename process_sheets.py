@@ -46,23 +46,30 @@ def parse_units_sheet(csv_url):
         if not row or not any(row):
             continue
 
-        unit_name = get_col(row, 0)      # Col A: Unit Name
-        historic_county = get_col(row, 2) # Col C: Historic County (e.g. Dorset, Lancashire)
+        unit_name = get_col(row, 0)        # Col A: Unit Name
+        historic_county = get_col(row, 2)  # Col C: Historic County (e.g. Dorset, Lancashire)
         if not historic_county:
             historic_county = "dorset"
 
-        # --- SEIGNEURIAL / MANOR PORTION (Col D: Manor ID) ---
-        manor_id = get_col(row, 3) # Col D
-        if manor_id:
-            display_name = unit_name
-            prefix = "Manor of"
-            unit_type = "seigneurial"
-            default_geom = f"{manor_id}_01"
+        manor_id = get_col(row, 3)   # Col D (index 3)
+        parish_id = get_col(row, 12) # Col M (index 12)
 
-            unit_county_lookup[manor_id] = historic_county.lower().strip()
+        primary_id = manor_id or parish_id
+        if not primary_id:
+            continue  # Skip row only if there is truly no ID anywhere
+
+        # --- SEIGNEURIAL / MANOR / HONOUR PORTION ---
+        if manor_id or (primary_id and not parish_id):
+            unit_id = manor_id or primary_id
+            display_name = unit_name
+            prefix = "Honour of" if "hon_" in unit_id else ("Duchy of" if "duc_" in unit_id else "Manor of")
+            unit_type = "seigneurial"
+            default_geom = f"{unit_id}_01"
+
+            unit_county_lookup[unit_id] = historic_county.lower().strip()
 
             spatial_units.append({
-                "unit_id": manor_id,
+                "unit_id": unit_id,
                 "display_name": display_name,
                 "display_prefix": prefix,
                 "type": unit_type,
@@ -115,11 +122,10 @@ def parse_units_sheet(csv_url):
                         "name": display_name
                     })
 
-            temporal_records[manor_id] = manor_records
-            unit_tenure_lookup[manor_id] = manor_records
+            temporal_records[unit_id] = manor_records
+            unit_tenure_lookup[unit_id] = manor_records
 
-        # --- ADMINISTRATIVE / PARISH PORTION (Col M: Parish ID) ---
-        parish_id = get_col(row, 12) # Col M
+        # --- ADMINISTRATIVE / PARISH PORTION ---
         if parish_id:
             display_name = unit_name
             prefix = "Parish of"
