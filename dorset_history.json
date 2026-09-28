@@ -7,9 +7,109 @@
   ],
   "man_shtr": [
     {
-      "start": 1149,
+      "start": 1066,
+      "end": 1085,
+      "lord": "Doda (monk)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1086,
       "end": 1922,
       "lord": "Odo, son of Everbold",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1549,
+      "end": 1922,
+      "lord": "Thomas Morton",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1607,
+      "end": 1610,
+      "lord": "George Morton (d. 1611)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1611,
+      "end": 1661,
+      "lord": "George Morton (d. 1662)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1662,
+      "end": 1698,
+      "lord": "John Morton",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1699,
+      "end": 1725,
+      "lord": "Edmund Morton-Pleydell (d. 1726)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1726,
+      "end": 1753,
+      "lord": "Edmund Morton-Pleydell (d. 1754)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1754,
+      "end": 1793,
+      "lord": "Edmund Morton-Pleydell (d. 1794)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1794,
+      "end": 1834,
+      "lord": "Edmund Morton-Pleydell (d. 1835)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    },
+    {
+      "start": 1835,
+      "end": 1922,
+      "lord": "John Clavell Mansel-Pleydell",
       "overlord": "",
       "geometry_file": "man_mlbs",
       "prefix": "Manor of",
@@ -19,9 +119,119 @@
   ],
   "man_hyde": [
     {
-      "start": 1186,
+      "start": 1066,
       "end": 1922,
       "lord": "",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1539,
+      "end": 1922,
+      "lord": "Thomas Trenchard (d. ~1549)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1603,
+      "end": 1633,
+      "lord": "John Ryves",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1634,
+      "end": 1665,
+      "lord": "George Ryves (d. 1666)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1666,
+      "end": 1688,
+      "lord": "George Ryves (d. 1689)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1689,
+      "end": 1691,
+      "lord": "Charles Ryves",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1692,
+      "end": 1703,
+      "lord": "Thomas Ryves (d. 1704)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1704,
+      "end": 1728,
+      "lord": "George Ryves (d. 1729)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1729,
+      "end": 1922,
+      "lord": "Thomas Ryves (d. 1788)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1837,
+      "end": 1881,
+      "lord": "Charles James Radclyffe (d. 1882)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1882,
+      "end": 1912,
+      "lord": "Charles James Radclyffe (d. 1913)",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    },
+    {
+      "start": 1913,
+      "end": 1922,
+      "lord": "Maj. Charles Robert Radclyffe",
       "overlord": "",
       "geometry_file": "man_hyde",
       "prefix": "Manor of",
@@ -31,9 +241,109 @@
   ],
   "man_mlbs": [
     {
-      "start": 1149,
+      "start": 1066,
+      "end": 1085,
+      "lord": "Doda (monk)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1086,
       "end": 1922,
       "lord": "Odo, son of Everbold",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1549,
+      "end": 1922,
+      "lord": "Thomas Morton",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1607,
+      "end": 1610,
+      "lord": "George Morton (d. 1611)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1611,
+      "end": 1661,
+      "lord": "George Morton (d. 1662)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1662,
+      "end": 1698,
+      "lord": "John Morton",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1699,
+      "end": 1725,
+      "lord": "Edmund Morton-Pleydell (d. 1726)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1726,
+      "end": 1753,
+      "lord": "Edmund Morton-Pleydell (d. 1754)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1754,
+      "end": 1793,
+      "lord": "Edmund Morton-Pleydell (d. 1794)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1794,
+      "end": 1834,
+      "lord": "Edmund Morton-Pleydell (d. 1835)",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    },
+    {
+      "start": 1835,
+      "end": 1922,
+      "lord": "John Clavell Mansel-Pleydell",
       "overlord": "",
       "geometry_file": "man_mlbs",
       "prefix": "Manor of",
