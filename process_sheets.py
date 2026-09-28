@@ -52,33 +52,34 @@ def parse_units_sheet(csv_url):
     county_records = []
     unit_county_lookup = {}
 
-    print(f"Connecting to Google Sheets CSV URL...")
+    print("Connecting to Google Sheets CSV URL...")
     req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req) as response:
         lines = [line.decode('utf-8-sig') for line in response.readlines()]
 
     reader = csv.reader(lines)
     rows = list(reader)
-    print(f"Downloaded {len(rows)} rows from Google Sheets.")
+    print(f"Downloaded {len(rows)} total rows from Google Sheets.")
 
-    # 1. Locate header row
+    # 1. Target Row 2 (Index 1) directly, fallback to Row 3 (Index 2) or Row 1 (Index 0)
     header_idx = -1
-    for idx, row in enumerate(rows[:15]):
-        cleaned_row = ["".join(e for e in c.lower() if e.isalnum()) for c in row if c]
-        if any(h in cleaned_row for h in ["sid", "unit", "sgeometry", "lord"]):
-            header_idx = idx
-            print(f"Header row identified at index {idx}: {row}")
-            break
+    for candidate_idx in [1, 2, 0]:
+        if candidate_idx < len(rows):
+            cleaned_row = ["".join(e for e in c.lower() if e.isalnum()) for c in rows[candidate_idx] if c]
+            if any(h in cleaned_row for h in ["sid", "unit", "sgeometry", "lord"]):
+                header_idx = candidate_idx
+                print(f"Header row detected at spreadsheet Row {header_idx + 1} (index {header_idx}): {rows[header_idx]}")
+                break
 
     if header_idx == -1:
-        header_idx = 2
-        print(f"Fallback: using header index 2.")
+        header_idx = 1  # Force Row 2 as default
+        print(f"Forcing default Header row at spreadsheet Row 2 (index 1): {rows[header_idx] if len(rows) > 1 else 'N/A'}")
 
     raw_headers = [c.strip() for c in rows[header_idx]]
     norm_headers = ["".join(e for e in h.lower() if e.isalnum()) for h in raw_headers]
     col_map = {name: idx for idx, name in enumerate(norm_headers) if name}
     
-    print(f"Mapped Column Keys: {list(col_map.keys())}")
+    print(f"Mapped Column Keys from Row {header_idx + 1}: {list(col_map.keys())}")
     data_rows = rows[header_idx + 1:]
 
     def get_val(row, *keys):
@@ -93,7 +94,7 @@ def parse_units_sheet(csv_url):
 
     unit_tenure_lookup = {}
 
-    for row in data_rows:
+    for row_num, row in enumerate(data_rows, start=header_idx + 2):
         if not row or not any(row):
             continue
 
@@ -103,6 +104,8 @@ def parse_units_sheet(csv_url):
 
         if not s_id:
             continue
+
+        print(f"Processing Row {row_num}: Found S-ID '{s_id}' for Unit '{unit_name}'")
 
         display_name = unit_name
         prefix = "Honour of" if s_id.startswith("hon_") else ("Duchy of" if s_id.startswith("duc_") else "Manor of")
@@ -202,7 +205,6 @@ if __name__ == "__main__":
             county_grouped_history[county_name] = {}
         county_grouped_history[county_name][uid] = records
 
-    # Ensure dorset_history.json is explicitly initialized even if dataset is empty
     if "dorset" not in county_grouped_history:
         county_grouped_history["dorset"] = {}
 
