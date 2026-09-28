@@ -1,1 +1,44 @@
-{}
+{
+  "man_bere": [
+    {
+      "tied_to": "Charborough",
+      "type": "link"
+    }
+  ],
+  "man_shtr": [
+    {
+      "start": 1149,
+      "end": 1922,
+      "lord": "Odo, son of Everbold",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Shitterton\na.k.a.\nWhitelovington"
+    }
+  ],
+  "man_hyde": [
+    {
+      "start": 1186,
+      "end": 1922,
+      "lord": "",
+      "overlord": "",
+      "geometry_file": "man_hyde",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Hyde"
+    }
+  ],
+  "man_mlbs": [
+    {
+      "start": 1149,
+      "end": 1922,
+      "lord": "Odo, son of Everbold",
+      "overlord": "",
+      "geometry_file": "man_mlbs",
+      "prefix": "Manor of",
+      "type": "seigneurial",
+      "name": "Milborne Stileham"
+    }
+  ]
+}
