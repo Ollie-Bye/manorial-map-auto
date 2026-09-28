@@ -7,11 +7,6 @@ import urllib.request
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-EZVrt4IOI6M5d3DQVPSCcQMHQSmZPot7DYWZLDzKRoIhCF0Z55nG2zJJ5C_2l4RKYESXWDhtmU8G/pub?gid=664764410&single=true&output=csv"
 
 def parse_dated_cell(cell_value, default_end=1922):
-    """
-    Parses multi-line cells formatted as:
-    '1066 bere_01\n1380 [None]'
-    Returns a list of dicts with start, end, and value.
-    """
     if not cell_value:
         return []
         
@@ -32,14 +27,12 @@ def parse_dated_cell(cell_value, default_end=1922):
         start_yr = entry["year"]
         val = entry["value"]
         
-        # If explicitly marked as [None] or None, the geometry/tenure ceases to exist from this date
         if val.lower() in ["[none]", "none", "-"]:
             continue
 
         if start_yr is None:
             continue
             
-        # Determine end year: one year prior to next entry's start year, or default_end
         if i + 1 < len(parsed) and parsed[i + 1]["year"] is not None:
             end_yr = parsed[i + 1]["year"] - 1
         else:
@@ -59,32 +52,38 @@ def parse_units_sheet(csv_url):
     county_records = []
     unit_county_lookup = {}
 
+    print(f"Connecting to Google Sheets CSV URL...")
     req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req) as response:
         lines = [line.decode('utf-8-sig') for line in response.readlines()]
 
     reader = csv.reader(lines)
     rows = list(reader)
+    print(f"Downloaded {len(rows)} rows from Google Sheets.")
 
-    # 1. Locate primary header row dynamically by searching for exact/clean headers
+    # 1. Locate header row
     header_idx = -1
     for idx, row in enumerate(rows[:15]):
-        cleaned_row = [re.sub(r'[\s_\-\(\)ⁿᵈ]', '', c.lower().strip()) for c in row if c]
-        if "sid" in cleaned_row or "unit" in cleaned_row or "sgeometry" in cleaned_row:
+        cleaned_row = ["".join(e for e in c.lower() if e.isalnum()) for c in row if c]
+        if any(h in cleaned_row for h in ["sid", "unit", "sgeometry", "lord"]):
             header_idx = idx
+            print(f"Header row identified at index {idx}: {row}")
             break
 
     if header_idx == -1:
         header_idx = 2
+        print(f"Fallback: using header index 2.")
 
     raw_headers = [c.strip() for c in rows[header_idx]]
-    norm_headers = [re.sub(r'[\s_\-\(\)ⁿᵈ]', '', h.lower()) for h in raw_headers]
+    norm_headers = ["".join(e for e in h.lower() if e.isalnum()) for h in raw_headers]
     col_map = {name: idx for idx, name in enumerate(norm_headers) if name}
+    
+    print(f"Mapped Column Keys: {list(col_map.keys())}")
     data_rows = rows[header_idx + 1:]
 
     def get_val(row, *keys):
         for key in keys:
-            norm_key = re.sub(r'[\s_\-\(\)ⁿᵈ]', '', key.lower())
+            norm_key = "".join(e for e in key.lower() if e.isalnum())
             idx = col_map.get(norm_key)
             if idx is not None and idx < len(row):
                 val = row[idx].strip()
@@ -98,27 +97,25 @@ def parse_units_sheet(csv_url):
         if not row or not any(row):
             continue
 
-        unit_name = get_val(row, "Unit")
-        historic_county = get_val(row, "Historic County", "County") or "dorset"
-        s_id = get_val(row, "S-ID", "SID")
+        unit_name = get_val(row, "unit")
+        historic_county = get_val(row, "historiccounty", "county") or "dorset"
+        s_id = get_val(row, "sid")
 
         if not s_id:
             continue
 
-        # --- SEIGNEURIAL / MANOR PORTION ---
         display_name = unit_name
         prefix = "Honour of" if s_id.startswith("hon_") else ("Duchy of" if s_id.startswith("duc_") else "Manor of")
         unit_type = "seigneurial"
 
         unit_county_lookup[s_id] = historic_county.lower().strip()
 
-        # Parse dated attributes
-        s_geom_raw = get_val(row, "S-Geometry", "SGeometry")
+        s_geom_raw = get_val(row, "sgeometry")
         geom_entries = parse_dated_cell(s_geom_raw)
-        lord_entries = parse_dated_cell(get_val(row, "Lord"))
-        overlord_entries = parse_dated_cell(get_val(row, "Overlord"))
-        lord_2nd_entries = parse_dated_cell(get_val(row, "Lord (2ⁿᵈ Moiety)", "Lord (2nd Moiety)", "Lord 2nd Moiety"))
-        overlord_2nd_entries = parse_dated_cell(get_val(row, "Overlord (2ⁿᵈ Moiety)", "Overlord (2nd Moiety)", "Overlord 2nd Moiety"))
+        lord_entries = parse_dated_cell(get_val(row, "lord"))
+        overlord_entries = parse_dated_cell(get_val(row, "overlord"))
+        lord_2nd_entries = parse_dated_cell(get_val(row, "lord2ndmoiety", "lord2nd"))
+        overlord_2nd_entries = parse_dated_cell(get_val(row, "overlord2ndmoiety", "overlord2nd"))
 
         default_geom = geom_entries[0]["value"] if geom_entries else f"{s_id}_01"
 
@@ -131,14 +128,13 @@ def parse_units_sheet(csv_url):
         })
 
         manor_records = []
-        lord_raw = get_val(row, "Lord")
+        lord_raw = get_val(row, "lord")
         tied_match = re.search(r"tied\s+to\s+([a-z0-9_]+)", lord_raw, re.IGNORECASE)
 
         if tied_match:
             target_id = tied_match.group(1)
             manor_records.append({"tied_to": target_id, "type": "link"})
         else:
-            # Build time segments based on S-Geometry date ranges
             for g_item in (geom_entries or [{"start": 1066, "end": 1922, "value": default_geom}]):
                 start_yr = g_item["start"]
                 end_yr = g_item["end"]
@@ -205,6 +201,10 @@ if __name__ == "__main__":
         if county_name not in county_grouped_history:
             county_grouped_history[county_name] = {}
         county_grouped_history[county_name][uid] = records
+
+    # Ensure dorset_history.json is explicitly initialized even if dataset is empty
+    if "dorset" not in county_grouped_history:
+        county_grouped_history["dorset"] = {}
 
     generated_files = []
     for county_name, history_data in county_grouped_history.items():
